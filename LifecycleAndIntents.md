@@ -1,11 +1,13 @@
 # Lifecycle and Intents for Native Firebolt Apps
 
-Lifecycle 2.0 defines when a native Firebolt app can use CPU, graphics, audio/video, memory, and network resources. Intents tell the app which experience to prepare when those resources are available.
+**Lifecycle 2.0** defines when a native Firebolt app can use CPU, graphics, audio/video, memory, and network resources. **Intents** tell the app which experience to prepare when those resources are available.
 
-The platform owns lifecycle transitions. Your responsibilities are:
+The primary purpose of the Application Lifecycle on the platform is to enable fast application startup, resume, and switching, while ensuring robust platform operation and efficient resource utilization.
+
+The platform owns lifecycle transitions. Your responsibilities as native app or runtime are:
 **subscribe to lifecycle changes during startup, allocate only the resources allowed in each state, consume the newest intent, and release resources promptly when the app is deactivated or suspended.**
 
-This page focuses on the native integration steps. For the lifecycle model and the reasons behind each state, refer to the Lifecycle 2.0 specification.
+This page focuses on the native application or runtime integration steps. For the lifecycle model and the reasons behind each state, refer to the Lifecycle 2.0 specification.
 
 ---
 
@@ -32,14 +34,14 @@ A native app starts in `initializing`. It remains there until it subscribes to `
 
 During cold launch or preload:
 
-1. Connect and authenticate the native Firebolt client using the endpoint and credentials supplied by the container.
-2. Initialize only the code and state needed to receive Firebolt callbacks.
-3. Call `Actions.intent()` and store the returned `intentId` as the last received ID.
-4. Subscribe to `Actions.onIntent` and route newer intents through the same handler.
-5. Subscribe to `Lifecycle.onStateChanged`.
-6. Follow the first transition from `initializing` to either `paused` or `suspended`.
+1. Read and use the environment variables provided by the AppContainer to initialize and configure your application. While in `initializing` state you can load resources such as code libraries and data files locally and via network but you MAY NOT yet allocate an EGL surface, GPU resources or an active AV session via Rialto. 
+2. Load the `firebolt-cpp-client` library and connect to the endpoint specified by `FIREBOLT_ENDPOINT` env var ASAP : `Firebolt::IFireboltAccessor::Instance().Connect(...)` 
+3. Upon successfull connection you now can talk with Firebolt App Gateway and use the Firebolt api, start with calling `Actions.intent()` and store its value and the returned `intentId` as the last received ID. If the intent value is `preload` you have strong hint that the platform will very likely transition you to `suspended` state in upcoming onStateChanged event.
+6. Subscribe to `Actions.onIntent` and route newer intents through the same handler.
+7. Subscribe to `Lifecycle.onStateChanged`. For the platform, this subscription serves as the lifecycle handshake with the application. Immediately after confirming this subscription method, the platform communicates the new Lifecycle state through an `onStateChanged` event. The new state is provided in the event payload.
+8. Follow the first transition from `initializing` to either `paused` or `suspended`. 
 
-Do not allocate an EGL surface, GPU resources, or an active AV session while still in `initializing`.
+Reiterating, do not allocate an EGL surface, GPU resources, or an active AV session while still in `initializing`.
 
 ```mermaid
 sequenceDiagram
