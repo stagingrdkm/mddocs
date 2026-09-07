@@ -34,12 +34,13 @@ A native app starts in `initializing`. It remains there until it subscribes to `
 
 During cold launch or preload:
 
-1. Read and use the environment variables provided by the AppContainer to initialize and configure your application. While in `initializing` state you can load resources such as code libraries and data files locally and via network but you MAY NOT yet allocate an EGL surface, GPU resources or an active AV session via Rialto. 
+1. Read and use the environment variables provided by the AppContainer to initialize and configure your application. While in `initializing` state you can load resources such as code libraries and data files locally and via network but you **MAY NOT yet allocate an EGL surface, GPU resources or an active AV session via Rialto**. 
 2. Load the `firebolt-cpp-client` library and connect ASAP to the endpoint specified by `FIREBOLT_ENDPOINT` env var. `Firebolt::IFireboltAccessor::Instance().Connect(...)` Upon successfull connection you can now talk with Firebolt AppGateway by using the Firebolt api
-3. Start with calling Firebolt `Actions.intent()` api and store its value and the returned `intentId` as the last received ID. The possible Intents values and their meaning are defined in [Intents Spec](https://wiki.rdkcentral.com/spaces/WG/pages/507518406/Firebolt+9+Intents+Specification). If the intent value is `preload`, it is a strong indication, though not an absolute guarantee, that the platform will soon transition the app to the `suspended` state (through the in step 6 upcoming onStateChanged event). Some other intents represent **deep-links** to a specific view, section, or entity within the app. If available at this early stage in the startup flow, such deep-link type of intent is also an indication, though no guarantee, that platform aims or intents to launch this app to the screen (with the particular deep-link view). In the usual - good case - app launch flow from cold startup to the screen, the lifecycle states following initializing are `paused` and subsequently `active`, typically occurring in quick succession. As an application developer, you are expected to realize the full requested intent as quickly as possible throughout these states, while respecting the constraints imposed by their resource contracts. To help accelerate intent fulfillment, the intent data provided during this early initialization phase can already be used to load, or prioritize the loading of, the most relevant data resources.
-4. Subscribe to `Actions.onIntent` and route newer intents through the same Intent handler. Various different Intents can occur during the lifetime of the app, even within a particular lifecycle state of the app. You want to be notified of such a intent change, so you can adapt immediately and act accordingly. An intent with an incremented ID invalidates the previous intent. It is not typical that the intent for an app changes during the app cold launch to screen flow but it is possible and need to cater for it. 
-5. Subscribe to `Lifecycle.onStateChanged`. For the platform, this subscription serves as the lifecycle handshake with the application.
-6. Usually immediately after confirming this subscription method, the platform communicates the new Lifecycle state through an `onStateChanged` event. The new state is provided in the event payload. Follow the first transition from `initializing` to either `paused` or `suspended`. 
+3. Start with calling Firebolt `Actions.intent()` api and store its value and the returned `intentId` as the last received ID. The possible Intents values and their meaning are defined in [Intents Spec](https://wiki.rdkcentral.com/spaces/WG/pages/507518406/Firebolt+9+Intents+Specification). If the intent value is `preload`, it is a strong indication, though not an absolute guarantee, that the platform will soon transition the app to the `suspended` state (through the in step 6 upcoming onStateChanged event). If the intent value is neither preload nor absent, the platform likely intends to launch the application on the screen rather than preload it, though no guarantee. To help accelerate startup, we recommend using this opportunity to begin **loading the data resources required for the initial splash screen** or first minimal UI presented by the application. Note that rendering the splash screen is not yet permitted in this lifecycle state; only the loading of data resources in preparation for rendering is allowed.
+Some intents represent **deep-links** to a specific view, section, or entity within the app. If available at this early stage in the startup flow, such deep-link type of intent is an indication, though no guarantee, that platform aims or intends to launch this app to the screen (with the particular deep-link view). In the usual - good case - app launch flow from cold startup to the screen, the lifecycle states following initializing are `paused` and subsequently `active`, typically occurring in quick succession. As an application developer, you are expected to realize the full requested intent as quickly as possible throughout these states, while respecting the constraints imposed by their resource contracts. To help accelerate intent fulfillment, the intent data provided during this early initialization phase can already be used to load, or prioritize the loading of, the relevant data resources for the specific screen(s).
+5. Subscribe to `Actions.onIntent` and and route newly received intents through the same intent handler. Different intents may be received throughout the lifetime of the application, including while the application remains in the same lifecycle state. As App you need to get notified of such a intent change, so you can adapt accordingly and quickly (without needing to poll). An intent with an incremented ID invalidates the previous intent. While it is rather uncommon for the intent to change during the application's cold-start-to-screen flow, it is possible, and applications should be prepared to handle this scenario. 
+6. Subscribe to `Lifecycle.onStateChanged`. For the platform, this subscription serves as the lifecycle handshake with the application.
+7. Usually immediately after confirming this subscription method, the platform communicates the new Lifecycle state through an `onStateChanged` event. The new state is provided in the event payload. Follow the first transition from `initializing` to either `paused` or `suspended`. 
 
 Reiterating, do not allocate an EGL surface, GPU resources, or an active AV session while still in `initializing`.
 
@@ -52,6 +53,7 @@ sequenceDiagram
 	A->>P: Actions.intent()
 	P-->>A: intentId + intent
 	A->>A: Store lastIntentId
+	A->>A: if intent is NOT preload, begin loading data for 1st minimal screen (eg splash)
 	A->>P: Subscribe Actions.onIntent
 	A->>P: Subscribe Lifecycle.onStateChanged
 	P-->>A: initializing to paused or suspended
@@ -101,15 +103,29 @@ The type and registration names in generated bindings can vary by SDK version. K
 ### `initializing` to `paused`
 
 Prepare the app for a normal launch:
+- upon `Lifecycle.onStateChanged` event with payload "currentState":"paused, "previousState":"initializing" 
+- load the Rialto Client lib and establish active communication session with Rialto Server but **do not start active Audio Video Session yet**.
+- Subscribe to `Presentation.onFocusedChanged` so the application can be notified when it gains or loses focus. An application is only eligible to receive focus while in the `active` lifecycle state. However, it is important to subscribe before the transition to active occurs; otherwise, the initial focus event may be missed. Applications may subscribe as early as the `initializing` state.
+- Using the Wayland client or essos library, create a full screen EGL surface or Vulkan surface.
+- Prepare and render the first minimal but complete graphical screen and commit/present it to the display (for example, by calling eglSwapBuffers()) as soon as possible. This is typically a splash screen (recommended) or another lightweight startup screen and does not need to represent the experience requested by the intent. For a good perceived App startup performance, it is important to render and present this first frame as early as possible, as this is prerequisite and serves as the trigger for the platform to transition the application to the next lifecycle state, `active`, where the application typically becomes visible and can start audio/video playback.
+- In parallel, continue processing the latest intent and prepare the requested user experience. GPU and RAM resources required for that experience may now be allocated and utilized.
+- If the application is still in the `paused` state and is ready to present the screen, section, or entity requested by the intent, it may then render and replace the initial Graphics splash screen with this screen, provided that the screen does not require audio/video resources.
 
-- Create the Rialto client, but do not start an active AV session yet
-- Create the Wayland/EGL surface
-- Load the minimal graphics required for a clean first frame
-- Prepare animation resources, but do not run animations
-- Process the latest intent and compose the requested experience
-- Render a stable splash or first frame without exposing incomplete UI
+In this transition you need to **create EGL or vulkan surface** and can **use the GPU, CPU, RAM memory required** to prep/construct full graphics application (screen as per intent) but no active Audio/Video yet. 
+Important to know that your **first frame rendered & committed** to the display is pre-requisite for being able to move to `active` state. Do not wait wait too long with that because it will directly affect App startup performance.
 
-The first committed frame makes the app eligible for activation. It does not itself mean that the app is active.
+### `paused` to `active`
+
+Application normally becomes visible. If not already done transition presentation from initial Graphics screen to intent screen. Audio/Video playback is allowed. When focus is true, application is confirmed to be visible and ready for user / key interaction. Interact with user and do your App thing. Upon new Intent events, act accordingly
+
+- Confirm the newest intent with `Actions.intent()`
+- Finish or update the destination requested by that intent
+- Start animations and user interaction
+- Create or resume active audio/video sessions
+- Keep the prepared surface ready for the platform to present without replacing it with a blank frame
+
+For an action that should wait until the app receives input focus, such as starting video requested by an intent, read `Presentation.focused()` and subscribe to `Presentation.onFocusedChanged`. These APIs report whether the app is receiving key presses.
+
 
 ### `initializing` to `suspended`
 
@@ -123,17 +139,6 @@ This transition is used for supported direct-to-suspended preloads. Keep the app
 
 For a `preload` intent, defer the full experience. The platform will supply a newer, more specific intent before transitioning the app to `active`; do not assume it arrives before the app enters `paused`.
 
-### `paused` to `active`
-
-Treat the app as visible for lifecycle and resource handling. The platform may still decide when the prepared surface is presented:
-
-- Confirm the newest intent with `Actions.intent()`
-- Finish or update the destination requested by that intent
-- Start animations and user interaction
-- Create or resume active audio/video sessions
-- Keep the prepared surface ready for the platform to present without replacing it with a blank frame
-
-For an action that should wait until the app receives input focus, such as starting video requested by an intent, read `Presentation.focused()` and subscribe to `Presentation.onFocusedChanged`. These APIs report whether the app is receiving key presses.
 
 ### `active` to `paused`
 
