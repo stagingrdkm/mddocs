@@ -103,8 +103,8 @@ The type and registration names in generated bindings can vary by SDK version. K
 ### `initializing` to `paused`
 
 Prepare the app for a normal launch:
-- upon `Lifecycle.onStateChanged` event with payload "newState":"paused", "oldState":"initializing" 
-- load the Rialto Client lib and establish active communication session with Rialto Server but **do not start active Audio Video Session yet**.
+- Transition is upon `Lifecycle.onStateChanged` event with payload "newState":"paused", "oldState":"initializing" 
+- Load the Rialto Client lib and establish active communication session with Rialto Server but **do not start active Audio Video Session yet**.
 - Subscribe to `Presentation.onFocusedChanged` so the application can be notified when it gains or loses focus. An application is only eligible to receive focus while in the `active` lifecycle state. However, it is important to subscribe before the transition to active occurs; otherwise, the initial focus event may be missed. Applications may subscribe as early as the `initializing` state.
 - Using the Wayland client or essos library, create a full screen EGL surface or Vulkan surface.
 - Prepare and render the first minimal but complete graphical screen and commit/present it to the display (for example, by calling eglSwapBuffers()) as soon as possible. This is typically a splash screen (recommended) or another lightweight startup screen and does not need to represent the experience requested by the intent. For a good perceived App startup performance, it is important to render and present this first frame as early as possible, as this is prerequisite and serves as the trigger for the platform to transition the application to the next lifecycle state, `active`, where the application typically becomes visible and can start audio/video playback.
@@ -116,33 +116,35 @@ Important to know that your **first frame rendered & committed** to the display 
 
 ### `paused` to `active`
 
-Application normally becomes visible, present intent screen, Audio/Video playback is allowed. When focus is true, application is confirmed to be visible and ready for key input, user interaction. Interact with user and do your App thing. Upon new Intent events, act accordingly
+Application normally becomes visible, presents intent screen, audio, video playback is allowed. When focus is true, application is confirmed to be visible and ready for key input, user interaction. Interact with user and do your App thing. Upon new Intent events, act accordingly
 
-- upon `Lifecycle.onStateChanged` event with payload "newState":"active", "oldState":"paused" 
-- Confirm the newest intent with `Actions.intent()` If it still same intent as prepared or in process of being prepared, transition presentation from initial Graphics screen to appropriate intent screen (if not already done). If it is a new intent, load all resources (data, GPU textures and vertices, AV if requested) for that new intent and present that view on screen.
-- Application normally becomes visible after the onStateChanged to active but this is not guaranteed. It is the main operator app that needs to confirm and set the app visible and give it focus.
-- if `Presentation.focused` is true or Upon event `Presentation.onFocuseChanged` is `true` the application is ready for key input, user interaction. In addition, you can interpret focus:true also as a confirmation, now guaranteed, that the application is visible on screen.
-- Application can now setup active Audio/Video sessions with Rialto Server for the views where A/V is needed and typically also user interaction is required.
-- The Application can now basically do whatever it is supposed to do when interacting with the user.
-- If new intent events come in, process and act accordingly
-- If the user wants to exit the Application through a menu within the application, the applicaiton must call `Lifecycle.close` method with `deactivate` params
+- The transition is upon `Lifecycle.onStateChanged` event with payload "newState":"active", "oldState":"paused" 
+- Confirm the latest intent with `Actions.intent()` If the intent matches the one that has already been prepared or is currently being prepared, transition from the initial graphics screen to the corresponding intent screen, if this has not already occurred. If a different intent is received, load all resources required for that intent, including data, GPU textures and vertices, and AV resources when applicable, then present the corresponding view.
+- The application normally becomes visible after the onStateChanged to active but this is not guaranteed. Visibility and focus must be confirmed by the operator app, which is responsible for giving te application visibility and granting it focus. This typically happens quasi immediately after onStateChanged to active event.  
+- If `Presentation.focused` is true or a `Presentation.onFocusedChanged` event is received with value `true`, the application is ready to accept key input and user interaction. In addition, the a focused state of true can be interpreted as a confirmation, now guaranteed, that the application is visible on screen.
+- The Application may now establish active audio and video session with Rialto Server for views where A/V functionality. User interaction is typically prerequisite for these views.
+- The application may now operate as intended, including processing user input, presenting content, and providing its full interactive experience.
+- If new intent events come in, process and act accordingly.
+- If the user chooses to exit the Application through a menu within the application, the applicaiton must call `Lifecycle.close` with `deactivate` parameter.
 
-In the active state the application has access to all available resources made available through the container configuration. The application is able to use CPU, RAM, persistent storage on flash, GPU resources such as vertices and textures and do Audio Video through Rialto. But you may generally also expect a container config with maximum limit on RAM memory usage, quota limit on persistent flash usage and maximum number of concurrent rialto audio video sessions. Based on the App permissions settings in the [metadata](https://github.com/rdkcentral/oci-package-spec/blob/main/metadata.md#permissions) of the bolt/ralf package, the App may also be restricted access to certain APIs sets and network capabilities.
+In the active state the application has access to all resources made available through its container configuration. This includes CPU, RAM, persistent flash storage, GPU resources such as vertices and textures and audio/video capabilities through Rialto. 
+However, the container configuration may impose resource limits, including a maximum RAM memory allocation, a storage quota for persistent flash usage, and a limit on the number of concurrent Rialto audio/video sessions. In addition, application permissions defined in the package [metadata](https://github.com/rdkcentral/oci-package-spec/blob/main/metadata.md#permissions) may restrict access to specific APIs sets, system capabilities, or network functionality.
 
 ### `initializing` to `suspended`
 
-This transition is used for supported direct-to-suspended preloads. Keep the app lightweight, also when in steady suspended state :
+This transition is used for supported direct-to-suspended preloads. Ensure the app remains lightweight, also when in steady suspended state
 
+- The transition is upon `Lifecycle.onStateChanged` event with payload "newState":"suspended", "oldState":"initializing" 
 - Do not create a Wayland/EGL surface
 - Do not establish active communication session with Rialto Server
-- Do not allocate GPU textures, vertices, shaders, or other graphics resources
-- Do not use lots of RAM memory. We have not formalized a maximum number yet but you can expect this to be lower than 100 MByte. 
-- Load needed code libraries, data and essential state only. In general, the application should remain in a balanced operational state where above resources are unavailable or constrained, while still being capable to resume to full functionality relatively quickly compared to cold launch when requested by the platform.
-- That same operational state should allow the application to be hibernated and successfully restored from hibernation upon platform request.
-- Continue to communicate with Firebolt App Gateway.
-- Process New intents when these arrive. If an intent arrives with value different than preload, the platform likely intends to resume the preloaded application and bring it on the screen, though no guarantee. Then you can prepare and load data resources for the splash and intent screen but not render or use GPU resources for it until you got onStateChange event to paused. 
+- Do not allocate GPU textures, vertices, shaders, or other GPU resources
+- Keep RAM usage to a minimum. We have not yet formalized a maximum limit, it is expected to be less than 100 MByte. 
+- Communicate with backend services and retrieve or persist data updates only when relevant, necessary for this state.
+- The application continues to maintain an active connection to the Firebolt App Gateway.
+- In general, the application should remain in a balanced operational state whereby above mentioned resources are unavailable or constrained, while still being able to resume to full functionality significantly faster than a cold launch when requested by the platform. Load only required code libraries, relevant data and application state necessary for such operation.
+- That same operational state should allow the application to be hibernated and successfully restore from hibernation upon platform request.
+- Process new intents as they arrive. If an intent is received with a value other than preload, the platform likely intends to resume the preloaded application to bring it to the screen, although this is not guaranteed. In this case, the application may prepare and load the data resources required for the splash and intent screens, but it must not render them or consume GPU resources until it receives an onStateChange event indicating the paused state.
   
-
 ### `active` to `paused`
 
 The app is no longer visible:
