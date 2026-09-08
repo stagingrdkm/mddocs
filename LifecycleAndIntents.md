@@ -111,7 +111,7 @@ Prepare the app for a normal launch:
 - In parallel, continue processing the latest intent and prepare the requested user experience. GPU and RAM resources required for that experience may now be allocated and utilized.
 - If the application is still in the `paused` state and is ready to present the screen, section, or entity requested by the intent, it may then render and replace the initial Graphics splash screen with this screen, provided that the screen does not require audio/video resources.
 
-In this transition you need to **create EGL or vulkan surface** and can **use the GPU, CPU, RAM memory required** to prep/construct full graphics application (screen as per intent) but no active Audio/Video yet. 
+You need to **create fullscreen EGL or vulkan surface** and can **use the GPU, CPU, RAM memory required** to prep/construct full graphics application (screen as per intent) but no active Audio/Video yet. 
 Important to know that your **first frame rendered & committed** to the display is pre-requisite for being able to move to `active` state. Do not wait wait too long with that because it will directly affect App startup performance.
 
 ### `paused` to `active`
@@ -138,8 +138,9 @@ This transition is used for supported direct-to-suspended preloads. Ensure the a
 - Do not create a Wayland/EGL surface
 - Do not establish active communication session with Rialto Server
 - Do not allocate GPU textures, vertices, shaders, or other GPU resources
-- Keep RAM usage to a minimum. We have not yet formalized a maximum limit, it is expected to be less than 100 MByte. 
-- Communicate with backend services and retrieve or persist data updates only when relevant, necessary for this state.
+- Keep RAM usage to a minimum. We have not yet formalized a maximum limit, it is expected to be less than 100 MByte.
+- The platform will likely to enforce that lower RAM memory limit and no GPU resources after an undefined period following the state transition.
+- Communicate with backend services and retrieve or persist data updates but only when relevant, valuable in this state.
 - The application continues to maintain an active connection to the Firebolt App Gateway.
 - In general, the application should remain in a balanced operational state whereby above mentioned resources are unavailable or constrained, while still being able to resume to full functionality significantly faster than a cold launch when requested by the platform. Load only required code libraries, relevant data and application state necessary for such operation.
 - That same operational state should allow the application to be hibernated and successfully restore from hibernation upon platform request.
@@ -148,21 +149,29 @@ This transition is used for supported direct-to-suspended preloads. Ensure the a
 ### `active` to `paused`
 
 The app is no longer visible:
-
-- Stop animations and other continuous rendering work
-- Stop or pause active AV as required by the app experience
-- Keep the most recent UX state and surface available for a hot return
-- Continue accepting newer intents and prepare their destination without showing it
+- The transition is upon `Lifecycle.onStateChanged` event with payload "newState":"paused", "oldState":"active"
+- Close the active Audio Video Rialto Session, keep communication with Rialto Session established.
+- Keep the most recent UX view / state or a relevant alternative with associated GPU resources available for a quasi instant, hot return
+- keep the existing EGL or vulkan surface active
+- Continue processing newer intents and prepare and render their requested screens but do no start audio/video session
+- clean up cached objects and remove obsolete views from navigation stack that are no longer relevant or provide no benefit for a hot return. This includes reclaiming assoicated RAM and GPU resources. In this state, the application should consume less memory than in the active state. However, no lower memory limit is currently enforced beyond the limit defined for the active state.
+- stop background tasks that are no longer relevant and bring no value in this state. Keep the background tasks that bring value, are needed for a quick hot return.
 
 ### `paused` to `suspended`
 
-Release resources promptly:
-
-- Destroy the EGL surface
-- Release GPU textures, buffers, vertices, shaders, and other GPU allocations
-- Release the Rialto client and AV resources
-- Reduce memory to the minimum needed for a hot launch
-- Stop unnecessary timers, background work, and network activity
+- The transition is upon `Lifecycle.onStateChanged` event with payload "newState":"suspended", "oldState":"initializing"
+- Stop rendering/committing Graphics frames. Not allowed anymore. Release GPU textures, buffers, vertices, shaders, and other GPU allocations.
+- You can keep and maintain data needed for splash screen or intent screen but not render it.
+- Destroy the EGL or Vulkan surface or resize it to 1x1 pixels
+- Close the communication with Rialto Server (or is it valuable and less overhead to keep that alive)
+- Release or close objects, caches, data and libraries that are no longer relevant. Stop unnecessary timers, background work, and network activity
+- Keep RAM usage to a minimum. We have not yet formalized a common maximum limit, it is expected to be less than 100 MByte.
+- The platform will likely to enforce that lower RAM memory limit and no GPU resources after an undefined period following the state transition.
+- You can continue to communicate with backend services and retrieve or persist data updates but only when relevant, valuable for this state.
+- The application continues to maintain an active connection to the Firebolt App Gateway.
+- In general, the application should remain in a balanced operational state whereby above mentioned resources are unavailable or constrained, while still being able to resume to full functionality significantly faster than a cold launch when requested by the platform. Load only required code libraries, relevant data and application state necessary for such operation.
+- That same operational state should allow the application to be hibernated and successfully restore from hibernation upon platform request.
+- Process new intents as they arrive. If an intent is received with a value other than preload, the platform likely intends to resume the preloaded application to bring it to the screen, although this is not guaranteed. In this case, the application may prepare and load the data resources required for the splash and intent screens, but it must not render them or consume GPU resources until it receives an onStateChange event indicating the paused state.
 
 > [!NOTE]
 > In `suspended`, the platform may limit CPU scheduling and network bandwidth, and the app must operate with a reduced memory footprint. Timers, callbacks, and network operations may therefore complete more slowly or less predictably. Do not rely on long-running or timing-sensitive work in this state, and make recovery operations safe to retry.
@@ -171,19 +180,27 @@ Do not depend on the platform to clean up native resources on the app's behalf.
 
 ### `suspended` to `paused`
 
-Rebuild what was released:
+prepare for app to become on screen
 
-- Recreate the Rialto client
-- Recreate the Wayland/EGL surface
-- Reload required GPU resources
-- Call `Actions.intent()` and process the intent only when its `intentId` is greater than the highest `intentId` currently stored by the app
-- Prepare and commit a stable first frame
+- The transition is upon `Lifecycle.onStateChanged` event with payload "newState":"paused", "oldState":"suspended", we typically call this resume transition
+- Load the Rialto Client lib and establish active communication session with Rialto Server but **do not start active Audio Video Session yet**.
+- If not already done, subscribe to `Presentation.onFocusedChanged` so the application can be notified when it gains or loses focus.
+- Using the Wayland client or essos library, create a full screen EGL surface or Vulkan surface. If a minimal 1x1 pixels surface already exists, it must be resized to full-screen before rendering begins
+- Prepare and render the first minimal but complete graphical screen and commit/present it to the display (for example, by calling eglSwapBuffers()) as soon as possible. This is typically a splash screen (recommended) or another lightweight startup screen and does not need to represent the experience requested by the intent. For a good perceived App startup performance, it is important to render and present this first frame as early as possible, as this is prerequisite and serves as the trigger for the platform to transition the application to the next lifecycle state, `active`, where the application typically becomes visible and can start audio/video playback.
+- Confirm the latest intent with `Actions.intent()` If the intent matches the one that has already been prepared or is currently being prepared, continue and now prepare for rendering it. If a different intent is received, load all resources required for that intent, including data, GPU textures and vertices but no audio video yet.
+- If the application is still in the `paused` state and is ready to present the screen, section, or entity requested by the intent, it may then render and replace the initial Graphics splash screen with this screen, provided that the screen does not require audio/video resources.
 
-The platform sets the new intent before this transition. Read it before rebuilding destination-specific UI.
+You need to **have full screen EGL or vulkan surface** and can **use the GPU, CPU, RAM memory required** to prep/construct full graphics application (screen as per intent) but no active Audio/Video yet. 
+Important to know that your **first frame rendered & committed** to the display in this state is pre-requisite for being able to move to `active` state. Do not wait wait too long with that because it will directly affect App startup performance.
 
 ### `suspended` to `hibernated`
 
-Complete any short synchronous work needed for a reliable restore. GPU resources and the EGL surface must already have been released while suspended. Do not begin new asynchronous work.
+- The transition is upon `Lifecycle.onStateChanged` event with payload "newState":"suspended", "oldState":"hibernated"
+- The platform will trigger this transition only if `hibernated` is declared in `supportedNonActiveStates` within package metadata
+- GPU resources and the EGL surface should have already have been released while suspended mode. Ensure that is the case
+- Prepare your app for it to be hibernated and able to successfully restore afterwards.
+- close files?
+Complete any short synchronous work needed for a reliable restore. Do not begin new asynchronous work.
 
 ### `hibernated` to `suspended`
 
