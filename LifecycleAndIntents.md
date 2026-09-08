@@ -324,6 +324,6 @@ When Lifecycle 2.0 and intents are wired correctly:
 - The app never creates a graphics surface during direct-to-suspended preload
 - Hot and resumed launches display the destination from the newest intent
 - Duplicate getter and event delivery never causes duplicate navigation
-- Deactivation stops foreground work without discarding hot-launch state
-- Suspension releases native graphics, AV, and memory resources
+- Deactivation stops foreground work and AV without discarding hot-launch state
+- Suspension releases native graphics and memory resources
 - Closure and termination remain controlled by the platform
