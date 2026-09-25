@@ -1,4 +1,5 @@
 NOW we have
+package
 {
   "id": "com.rdkcentral.base",
   "version": "0.4.0",
@@ -14,6 +15,21 @@ NOW we have
   }
 }
 
+https://github.com/rdkcentral/meta-bolt-app-examples/blob/develop/package-configs/com.rdkcentral.vkmark.json
+{
+  "id": "com.rdkcentral.vkmark",
+  "version": "0.1.0",
+  "name": "vkmark",
+  "packageType": "application",
+  "entryPoint": "/usr/bin/vkmark-vulkan-test.sh",
+  "dependencies": {
+    "com.rdkcentral.base": "0.3.0"
+  },
+  "permissions": [
+  ],
+  "configuration": {
+  }
+}
 "version" is "Major.Minor.Patch"
 
 There is arch deliberate choice to not allow 2 or more versions of same package "id" when type is "application".   Y+2
@@ -35,4 +51,27 @@ We want runtime Minor and Patch version to be backward compatible, Upperlayer bo
 Practical guidline within RDKM add Major version as part of "id" name. Not mandatory for operators to follow
 "id": "com.rdkcentral.base:0",   "version": "0.4.0",
 "id": "com.rdkcentral.base:1",   "version": "1.4.0",
+
+change "com.rdkcentral.base": "0.3.0" 
+to
+change "com.rdkcentral.base:0": "^0.4.0" 
+change "com.rdkcentral.base:1": "^1.4.0" 
+
+{
+  "id": "com.rdkcentral.vkmark",
+  "version": "0.1.0",
+  "name": "vkmark",
+  "packageType": "application",
+  "entryPoint": "/usr/bin/vkmark-vulkan-test.sh",
+  "dependencies": {
+    "com.rdkcentral.base": "0.3.0"
+  },
+  "permissions": [
+  ],
+  "configuration": {
+  }
+}
+"version" is "Major.Minor.Patch"
+
+
 
