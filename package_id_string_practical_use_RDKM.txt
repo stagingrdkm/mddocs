@@ -13,3 +13,16 @@ NOW we have
   "configuration": {
   }
 }
+
+"version" is "Major.Minor.Patch"
+
+There is arch deliberate choice to not allow 2 or more versions of same package "id" when type is "application".   Y+2
+There is arch deliberate choice to not allow 2 or more versions of same package "id" when type is "runtime" or "base" Y+1
+If you want to do that, you need to create new package "id" 
+On MW you cannot run 2 versions of same package "id" when type is "application", app launch api is with "id" only but not with a "version" as argument  Y+2
+On MW you can or cannot run 2 versions of same package "id" when "runtime" or "base"   ??
+On MW you can or cannot install 2 versions of same package "id" when type is "runtime" or "base"   ??
+
+On MW you cannot uninstall 1 of 2 versions of same package "id" when type is "runtime" or "base"  Uninstall api has no version argument
+
+There is requirement to be able to run 2 different versions of "runtime" in pararall
