@@ -1,5 +1,6 @@
-NOW we have
-package
+NOW we have for base package 
+https://github.com/rdkcentral/meta-bolt-distro/blob/develop/package-configs/com.rdkcentral.base.json
+following naming
 {
   "id": "com.rdkcentral.base",
   "version": "0.4.0",
@@ -15,6 +16,7 @@ package
   }
 }
 
+For an application we have following, mind the dependency field
 https://github.com/rdkcentral/meta-bolt-app-examples/blob/develop/package-configs/com.rdkcentral.vkmark.json
 {
   "id": "com.rdkcentral.vkmark",
@@ -31,33 +33,50 @@ https://github.com/rdkcentral/meta-bolt-app-examples/blob/develop/package-config
   }
 }
 "version" is "Major.Minor.Patch"
+"version": "0.1.0"
+it can be 3 or 4 numbers "0.1.0.1" is also allowed
+"Major" version needs to be changed when there is breaking change
 
-There is arch deliberate choice to not allow 2 or more versions of same package "id" when type is "application".   Y+2
-There is arch deliberate choice to not allow 2 or more versions of same package "id" when type is "runtime" or "base" Y+1
-If you want to do that, you need to create new package "id" 
-On MW you cannot run 2 versions of same package "id" when type is "application", app launch api is with "id" only but not with a "version" as argument  Y+2
-On MW you can or cannot run 2 versions of same package "id" when "runtime" or "base"   ??
-On MW you can or cannot install 2 versions of same package "id" when type is "runtime" or "base"   ??
+There is Arch deliberate choice to not allow 2 or more versions of same package "id" when type is "application". 
+On MW you cannot run 2 versions of same package "id" when type is "application", app launch api is with "id" only and not with a "version" as argument
 
+There is arch deliberate choice to not allow 2 or more versions of same package "id" when type is "runtime" or "base"
+=> If you want to do that, you need to create new package "id" 
+On MW you will as of M10 NOT be able to install or run 2 versions of same package "id" when type is "runtime" or "base". On previous version this was possible but also had issues
 On MW you cannot uninstall 1 of 2 versions of same package "id" when type is "runtime" or "base"  Uninstall api has no version argument
 
-There is requirement to be able to run 2 different versions of "runtime" in pararall
+There is requirement to be able to run 2 different versions of a "runtime" in parallel
+=> When you want to do that you need to create new "id" for the runtime package with the different version.
 
-ANSWER when you want to do that you need to create new "id" for the runtime package with the different version.
-We want runtime Minor and Patch version to be backward compatible, Upperlayer bolts should not have to change their deps data when, have to be reinstalled
-
+Currently we use as id and version string for base layer
 "id": "com.rdkcentral.base",   "version": "0.4.0",
 
-Practical guidline within RDKM add Major version as part of "id" name. Not mandatory for operators to follow
-"id": "com.rdkcentral.base_0",   "version": "0.4.0",
-"id": "com.rdkcentral.base_1",   "version": "1.4.0",
-"id": "com.rdkcentral.base_1",   "version": "1.4.0.2",
+Because of the above described Arch choice and MW change to not allow 2 different versions of same runtime "id" 
+and to support our requirement to be able to run 2 different versions of a "runtime" in parallel we need to change string/naming pattern of the "id"
 
-change "com.rdkcentral.base": "0.3.0" 
-to
-change "com.rdkcentral.base_0": "^0.4.0" 
-and when you want to use base_1  upgrade
-change "com.rdkcentral.base_1": "^1.4.0" 
+Here is proposal for that new "practical" naming pattern and the logic behind it for use within RDKM.
+Summarized we propose to add as suffix _MAJOR_VERSION_NUMBER to its existing "id" string
+Operators choose their own naming pattern as long it is compliant with ralf oci-package spec. Is not mandatory for them to follow below approach.
+
+Concrete for base, that was previously "id": "com.rdkcentral.base" with version ""0.4.0"
+changing string to one that adds _MAJOR_VERSION_number suffix means
+"id": "com.rdkcentral.base_0" , suffix _0 because "0" "version": "0.4.0",
+"id": "com.rdkcentral.base_1",  for one with "version": "1.4.0" or "1.4.0.2",
+
+------------------------------------
+A runtime upgrade to new version with same Major but higher Minor and Patch version is expected to be backward compatible. 
+When we upgrade a runtime to such new compatible version, we don't want to be forced to upgrade upper applications that use it as depedency.
+You can use the "^" syntax in dependency declaration field of the application to signal that. 
+example "dependencies": {"com.rdkcentral.base_1": "^1.4.0"}  means I am compatible, will support loading with lower layer versions of id "com.rdkcentral.base_1" between version "1.4.0" and "1.X.Y" With X and Y being whatever number. (or does it need to be higher than 4.0?)
+
+Currently we use as dependency field in our application a value that specifies exact dependency version.
+That has as consequence that you always need to upgrade that application when underlying runtime upgrades to new compatible version with same "id".
+To solve that we can use the "^.MINOR.PATCH" signalling as described above.
+So in example app with "id": "com.rdkcentral.vkmark" we defined as "dependencies": {"com.rdkcentral.base": "0.3.0"}
+That we need to change to  "dependencies": {"com.rdkcentral.base_0": "^0.3.0"} 
+
+and when you want that app to explicitly upgrade to new Major version of base, for example "com.rdkcentral.base_1": "^1.4.0" you should then define it as 
+"dependencies": {"com.rdkcentral.base_1": "^1.4.0"}
 
 {
   "id": "com.rdkcentral.vkmark",
@@ -75,5 +94,12 @@ change "com.rdkcentral.base_1": "^1.4.0"
 }
 "version" is "Major.Minor.Patch"
 
-
+---------------------------------------
+Now the 3rd subsequent change proposal we would like to do, only for "base", is to add "9" in "id" naming string of base to indicate it is tied to version9 of RDK OS.
+If we would do in future upgrade to RDK10 we would switch to base10. 
+So above proposal would result in changing from "id" "com.rdkcentral.base_0" to 
+1)"com.rdkcentral.base9_0"  for base with version:0.X.Y
+Alternatives could be 
+2)"com.rdkcentral.rdk9.base_0" or 3)"com.rdkcentral.base.rdk9_0" 
+I am in favor of 2, Let's discuss and make decision
 
