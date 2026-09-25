@@ -55,6 +55,7 @@ Practical guidline within RDKM add Major version as part of "id" name. Not manda
 change "com.rdkcentral.base": "0.3.0" 
 to
 change "com.rdkcentral.base:0": "^0.4.0" 
+and when you want to use base:1  upgrade
 change "com.rdkcentral.base:1": "^1.4.0" 
 
 {
@@ -64,7 +65,7 @@ change "com.rdkcentral.base:1": "^1.4.0"
   "packageType": "application",
   "entryPoint": "/usr/bin/vkmark-vulkan-test.sh",
   "dependencies": {
-    "com.rdkcentral.base": "0.3.0"
+    "com.rdkcentral.base:1": "^1.4.0"
   },
   "permissions": [
   ],
