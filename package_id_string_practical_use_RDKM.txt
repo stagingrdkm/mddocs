@@ -26,3 +26,13 @@ On MW you can or cannot install 2 versions of same package "id" when type is "ru
 On MW you cannot uninstall 1 of 2 versions of same package "id" when type is "runtime" or "base"  Uninstall api has no version argument
 
 There is requirement to be able to run 2 different versions of "runtime" in pararall
+
+ANSWER when you want to do that you need to create new "id" for the runtime package with the different version.
+We want runtime Minor and Patch version to be backward compatible, Upperlayer bolts should not have to change their deps data when, have to be reinstalled
+
+"id": "com.rdkcentral.base",   "version": "0.4.0",
+
+Practical guidline within RDKM add Major version as part of "id" name. Not mandatory for operators to follow
+"id": "com.rdkcentral.base:0",   "version": "0.4.0",
+"id": "com.rdkcentral.base:1",   "version": "1.4.0",
+
