@@ -49,14 +49,15 @@ We want runtime Minor and Patch version to be backward compatible, Upperlayer bo
 "id": "com.rdkcentral.base",   "version": "0.4.0",
 
 Practical guidline within RDKM add Major version as part of "id" name. Not mandatory for operators to follow
-"id": "com.rdkcentral.base:0",   "version": "0.4.0",
-"id": "com.rdkcentral.base:1",   "version": "1.4.0",
+"id": "com.rdkcentral.base_0",   "version": "0.4.0",
+"id": "com.rdkcentral.base_1",   "version": "1.4.0",
+"id": "com.rdkcentral.base_1",   "version": "1.4.0.2",
 
 change "com.rdkcentral.base": "0.3.0" 
 to
-change "com.rdkcentral.base:0": "^0.4.0" 
-and when you want to use base:1  upgrade
-change "com.rdkcentral.base:1": "^1.4.0" 
+change "com.rdkcentral.base_0": "^0.4.0" 
+and when you want to use base_1  upgrade
+change "com.rdkcentral.base_1": "^1.4.0" 
 
 {
   "id": "com.rdkcentral.vkmark",
@@ -65,7 +66,7 @@ change "com.rdkcentral.base:1": "^1.4.0"
   "packageType": "application",
   "entryPoint": "/usr/bin/vkmark-vulkan-test.sh",
   "dependencies": {
-    "com.rdkcentral.base:1": "^1.4.0"
+    "com.rdkcentral.base_1": "^1.4.0"
   },
   "permissions": [
   ],
