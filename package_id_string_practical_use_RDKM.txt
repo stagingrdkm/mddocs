@@ -95,11 +95,14 @@ and when you want that app to explicitly upgrade to new Major version of base, f
 "version" is "Major.Minor.Patch"
 
 ---------------------------------------
-Now the 3rd subsequent change proposal we would like to do, only for "base", is to add "9" in "id" naming string of base to indicate it is tied to version9 of RDK OS.
-If we would do in future upgrade to RDK10 we would switch to base10. 
+The 3rd subsequent change proposal we would like to do, only for "base", is to add "9" in "id" naming string of base to indicate it is tied to version9 of RDK OS.
+Base9 contains Firebolt9 api clientlib which are made to work against Firebolt9 App GW which is tied to rdk9.
+If we would do in future upgrade to RDK10 we would switch to base10 because we will not guarantee compatibility between base9 and rdk10. 
+In fact we prefer all native apps to be rebuild when switching to major new version of RDK. 
+By adding that rdk9 / 10 in "id" of base layer that distinction we will be clear and visible also in dependency definition of upper layer Native apps or runtimes, no doubts possible. 
 So above proposal would result in changing from "id" "com.rdkcentral.base_0" to 
-1)"com.rdkcentral.base9_0"  for base with version:0.X.Y
-Alternatives could be 
-2)"com.rdkcentral.rdk9.base_0" or 3)"com.rdkcentral.base.rdk9_0" 
+1)"com.rdkcentral.base9_0"  for base with version:0.X.Y.  Alternatives could be 
+2)"com.rdkcentral.rdk9.base_0" or
+3)"com.rdkcentral.base.rdk9_0" 
 I am in favor of 2, Let's discuss and make decision
 
